@@ -11,15 +11,13 @@ from flask_cors import CORS,cross_origin
 
 app = Flask(__name__)
 
-@app.route('/',methods=['GET'])  # route to display the home page
-@cross_origin()
+
 def homePage():
     return render_template("index.html")
 
-@app.route('/review',methods=['POST','GET']) # route to show the review comments in a web UI
+@app.route('/',methods=['POST','GET']) # route to show the review comments in a web UI
 @cross_origin()
 
-@app.route('/', methods=['POST', 'GET'])  # route with allowed methods as POST and GET
 def index():
     if request.method == 'POST':
         searchString = request.form['content'].replace(" ", "")  # obtaining the search string entered in the form
