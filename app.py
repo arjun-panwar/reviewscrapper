@@ -166,7 +166,7 @@ def index():
 
                 data_file.close()
                 return render_template('results.html', result=searchString,total=i )
-        except Exception as e::
+        except Exception as e:
             dbConn = pymongo.MongoClient("mongodb+srv://arjun:arjun2001@cluster0.0h5a3.mongodb.net/crawlerDB?retryWrites=true&w=majority")  # opening a connection to Mongo
             db = dbConn['crawlerDB']  # connecting to the database called crawlerDB
             reviews = db[searchString].find({})  # searching the collection with the name same as the keyword
