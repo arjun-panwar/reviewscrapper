@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  <meta charset="UTF-8">
+  <title>Review Page</title>
+    <title>Review Page</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+
+</head>
+
+<body>
+
+  <div class="table-users">
+   <div class="header">Flipkart Review Scrapper</div>
+      </div>
+  <div>
+      <div class="header">Product - {{result}}</div>
+      <div class="header">No. of reviews found  - {{total}}</div>
+<div class="header"><a href="/static/{{result}}.csv" target="_blank"  style="margin-right: 5px;">Download CSV file </a>
+</div>
+
+
+</div>
+
+
+
+</body>
+
+</html>
