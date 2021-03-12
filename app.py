@@ -22,8 +22,7 @@ def index():
     if request.method == 'POST':
         searchString = request.form['content'].replace(" ", "")  # obtaining the search string entered in the form
         try:
-            dbConn = pymongo.MongoClient(
-                "mongodb+srv://arjun:password@cluster0.0h5a3.mongodb.net/crawlerDB?retryWrites=true&w=majority")  # opening a connection to Mongo
+            dbConn = pymongo.MongoClient("mongodb server url")  # opening a connection to Mongo
             db = dbConn['crawlerDB']  # connecting to the database called crawlerDB
             reviews = db[searchString].find({})  # searching the collection with the name same as the keyword
             if reviews.count() > 500:  # if there is a collection with searched keyword and it has records in it
