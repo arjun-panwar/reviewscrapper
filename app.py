@@ -1,15 +1,20 @@
 # doing necessary imports
 
 from flask import Flask, render_template, request, jsonify
-# from flask_cors import CORS,cross_origin
 import requests
 from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen as uReq
 import pymongo
 import csv
 from flask_cors import CORS,cross_origin
+import os
+import smtplib
+from email.message import EmailMessage
+import var
 
 app = Flask(__name__)
+
+
 
 
 def homePage():
@@ -20,24 +25,19 @@ def homePage():
 
 def index():
     if request.method == 'POST':
-        searchString = request.form['content'].replace(" ", "")  # obtaining the search string entered in the form
+        searchString = request.form['searchid'].replace(" ", "")  # obtaining the search string entered in the form
+        email = request.form['email'].replace(" ", "")  # obtaining the search string entered in the form
         try:
-            dbConn = pymongo.MongoClient("mongodb server url")  # opening a connection to Mongo
+            dbConn = pymongo.MongoClient(var.os.environ['mongodbserver'])  # opening a connection to Mongo
             db = dbConn['crawlerDB']  # connecting to the database called crawlerDB
             reviews = db[searchString].find({})  # searching the collection with the name same as the keyword
             if reviews.count() > 500:  # if there is a collection with searched keyword and it has records in it
                 # now we will open a file for writing
-                file="static/"+searchString +".csv"
-                data_file = open(file, 'w')
-
-                # create the csv writer object
-                csv_writer = csv.writer(data_file)
-
-                # Counter variable used for writing
-                # headers to the CSV file
+                file="static/"+searchString +".csv" #file name
+                data_file = open(file, 'w')  #creating csv file
+                csv_writer = csv.writer(data_file) # create the csv writer object
                 count = 0
                 i = 0
-
                 for review in reviews:
                     if count == 0:
                         # Writing headers of CSV file
@@ -50,6 +50,7 @@ def index():
                     i=i+1
 
                 data_file.close()
+                mail(email,searchString)
                 return render_template('results.html',result = searchString,total=i )  # show the results to user
             else:
 
@@ -76,7 +77,7 @@ def index():
                 j=0
                 running = True
                 del rev_link_boxs[0:7]
-                while running:
+                while running:         #finding review page URL
                      try:
                         link_box= rev_link_boxs[j].find("div", {"class": "col JOpGWq"})
                         rpLink = "https://www.flipkart.com" + link_box.a['href']
@@ -90,15 +91,15 @@ def index():
                 i=0
 
                 while p<lastp:
-                    rpLink=rpLink[0:(rpLink.find("&aid=") + 5)] + "overall&page="+str(p)
+                    rpLink=rpLink[0:(rpLink.find("&aid=") + 5)] + "overall&page="+str(p) #changing review page link
                     revpRes = requests.get(rpLink)  # getting the review page from server
                     revp_html = bs(revpRes.text, "html.parser")  # parsing the product page as HTML
 
 
                     commentboxes = revp_html.find_all('div', {'class': "_1AtVbE col-12-12"})  # finding the HTML section containing the customer comments
 
-                    #  iterating over the comment section to get the details of customer and their comments
-                    while lpage:
+
+                    while lpage:                                              #finding last page number
                         last=commentboxes[-1]
                         lastp = int(last.div.div.find_all('span')[0].text[10:].replace(",", ""))
                         lpage=False
@@ -106,7 +107,7 @@ def index():
 
                     del commentboxes[0:4]
                     del commentboxes[-1]
-                    for commentbox in commentboxes:
+                    for commentbox in commentboxes:            #  iterating over the comment section to get the details of customer and their comments
                         try:
                             name = commentbox.div.div.find_all('p', {'class': '_2sc7ZR _2V5EHH'})[0].text
 
@@ -136,8 +137,8 @@ def index():
                                   "Comment": custComment}  # saving that detail to a dictionary
                         x = table.insert_one(
                             mydict)  # insertig the dictionary containing the rview comments to the collection
-                        reviews.append(mydict)
-                        # appending the comments to the review list
+                        reviews.append(mydict)                        # appending the comments to the review list
+
 
 
 
@@ -162,12 +163,13 @@ def index():
                     csv_writer.writerow(review.values())
 
                 data_file.close()
+                mail(email,searchString)
                 return render_template('results.html', result=searchString,total=i )
         except Exception as e:
             dbConn = pymongo.MongoClient("mongodb+srv://arjun:arjun2001@cluster0.0h5a3.mongodb.net/crawlerDB?retryWrites=true&w=majority")  # opening a connection to Mongo
             db = dbConn['crawlerDB']  # connecting to the database called crawlerDB
             reviews = db[searchString].find({})  # searching the collection with the name same as the keyword
-            if reviews.count() > 500:  # if there is a collection with searched keyword and it has records in it
+            if reviews.count() > 0:  # if there is a collection with searched keyword and it has records in it
                 # now we will open a file for writing
                 file = "static/" + searchString + ".csv"
                 data_file = open(file, 'w')
@@ -189,13 +191,112 @@ def index():
                     # Writing data of CSV file
                     csv_writer.writerow(review.values())
 
+
                 data_file.close()
+                mail(email,searchString)
                 return render_template('results.html', result=searchString,total=i )  # show the results to user
             else:
                 print('The Exception message is: ', e)
                 return 'something is wrong'
     else:
         return render_template('index.html')
+
+def mail(email,searchString):
+    try:
+        EMAIL_ADDRESS = var.os.environ['emailid']
+
+        file = "static/" + searchString + ".csv"
+        msg = EmailMessage()
+        msg['Subject'] = searchString +" Flipkart Reviews"
+        msg['From'] = EMAIL_ADDRESS
+        msg['To'] = email
+        msg.set_content('''
+
+Hi there,
+
+Thanks for being awesome!.
+
+Find a CSV attachment with this mail which contains reviews scrapped from flipkart of {}
+
+Thanks & Regards
+Arjun Panwar
+
+
+!! For such mail service contact me at arjunpanwar@earthrootfoundation.org!!
+
+'''.format(searchString))
+
+        msg.add_alternative("""\
+        <!DOCTYPE html>
+        <html>
+            <body>
+      <div data-marker="__QUOTED_TEXT__">
+<div>
+<table border="0" cellpadding="0" cellspacing="0" class="body" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background-color: #ffffff; margin-top: 10%;">
+<tbody>
+<tr>
+<td class="container" style="font-family: sans-serif; font-size: 14px; vertical-align: top; display: block; margin: 0 auto; max-width: 580px; padding: 10px; width: 580px;">
+<div class="content" style="box-sizing: border-box; display: block; margin: 0 auto; max-width: 580px; padding: 10px;">
+<table class="main" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%; background-color: #203b2a; color: #fff76f; font-family: 'Open Sans', sans-serif; box-shadow: 10px 10px 5px grey; border-radius: 3px;">
+<tbody>
+<tr>
+<td class="wrapper" style="font-family: sans-serif; font-size: 14px; vertical-align: top; box-sizing: border-box; padding: 20px;">
+<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;">
+<tbody>
+<tr>
+<td style="font-family: sans-serif; font-size: 14px; vertical-align: top;">
+<p style="font-family: sans-serif; font-size: 14px; font-weight: bold; margin: 0; margin-bottom: 15px;"><span style="color: #ffffff;">Hi there,</span></p>
+<p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; margin-bottom: 15px;"><span style="color: #ffffff;">Thanks for being awesome!.</span></p>
+<hr style="border-top: 1px solid red; margin-bottom: 10px;" />
+<p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; margin-bottom: 15px;"><span style="color: #ffffff;">Find a CSV attachment with this mail which contains reviews scrapped from flipkart of {}</span></p>
+<p style="font-family: sans-serif; font-size: 14px; font-weight: bold; margin: 0; margin-bottom: 5px; margin-top: 10%;"><span style="color: #ffffff;">Thanks &amp; Regards</span><br /><span style="color: #ffffff;">Arjun Panwar</span><br /><br /></p>
+</td>
+</tr>
+<tr>
+<td align="center">
+<p style="font-family: sans-serif; font-size: 12px !important; font-weight: normal; font-style: italic; margin: 0; margin-bottom: 0px; margin-top: 10%;"><span style="color: #000080; background-color: #ffffff;">&nbsp; &nbsp; &nbsp;!! To get such mail service mail me at arjunpanwar@earthrootfoundation.org !!&nbsp; &nbsp;&nbsp;</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="footer" style="clear: both; margin-top: 10px; text-align: center; width: 100%;">
+<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: separate; mso-table-lspace: 0pt; mso-table-rspace: 0pt; width: 100%;">
+<tbody>
+<tr>
+<td class="content-block powered-by" style="font-family: sans-serif; vertical-align: top; padding-top: 10px; font-size: 12px; color: #203b2a; text-align: center;">Powered by <strong>Arjun</strong>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+      </body>
+        </html>
+        """.format(searchString), subtype='html')
+        with open(file, "rb") as f:
+            file_data = f.read()
+            file_name = searchString + ".csv"
+        msg.add_attachment(file_data, maintype="application", subtype="octet-stream", filename=file_name)
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ADDRESS, var.os.environ['pass'])
+            smtp.send_message(msg)
+        os.remove("file")
+
+
+
+    except Exception as e:
+        return
+
 
 
 if __name__ == "__main__":
